@@ -1,0 +1,55 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/*'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  id-token: write 
+  contents: read
+  security-events: write
+
+jobs:
+  code-security-scan:
+    name: Application Security Testing
+    uses: ./.github/workflows/shared-codeql.yml
+    with:
+      language: 'csharp'
+
+  build-and-test:
+    name: Build, Test, and Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for GitVersion commit graph analysis
+
+      - name: Calculate Version
+        id: versioning
+        uses: ./.github/actions/calculate-version
+
+      - name: Execute .NET Build and SonarQube
+        uses: ./.github/actions/dotnet-build-sonar
+        with:
+          solution-path: './src/Application.sln'
+          build-configuration: 'Release'
+          sonar-project-key: 'sandbox-app'
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          sonar-host-url: ${{ secrets.SONAR_HOST_URL }}
+
+      # -------------------------------------------------------------------------
+      # TODO (PENDING DACI): ARTIFACT PROMOTION STRATEGY
+      # Placeholder: Assuming "Build-Once". Publishing a generic artifact.
+      # If "Rebuild-per-Environment" is chosen, this will be refactored.
+      # -------------------------------------------------------------------------
+      - name: Publish Generic Application Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-drop
+          path: ./src/bin/Release/net8.0/publish/

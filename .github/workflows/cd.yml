@@ -1,0 +1,71 @@
+name: Continuous Deployment (CD)
+
+on:
+  workflow_run:
+    workflows: ["Continuous Integration (CI)"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-qa:
+    name: Deploy to QA
+    runs-on: ubuntu-latest
+    environment: QA
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-drop
+          path: ./app-drop
+
+      # TODO: PENDING DACI - AZURE CREDENTIALS
+      # Placeholder: Standard Federated Identity
+      - name: Authenticate to Azure
+        uses: ./.github/actions/azure-login
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # -------------------------------------------------------------------------
+      # TODO (PENDING DACI): VARIABLE MANAGEMENT
+      # Placeholder logic for Configuration-as-Code vs Native Variables.
+      # -------------------------------------------------------------------------
+      - name: Inject Environment Variables
+        shell: bash
+        run: |
+          echo "PENDING DECISION: Waiting for NuGet vs Native Variable DACI."
+          echo "Application configuration will be injected here."
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'sandbox-qa-app'
+          package: ./app-drop
+
+  deploy-prod:
+    name: Deploy to Production
+    needs: deploy-qa
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      # -------------------------------------------------------------------------
+      # TODO (PENDING DACI): PDP RELEASE LOCK
+      # Placeholder for API webhook check against Jira/PDP.
+      # -------------------------------------------------------------------------
+      - name: PDP Release Gate Check
+        shell: bash
+        run: |
+          echo "PENDING DECISION: API Webhook to PDP will be inserted here."
+          echo "Deployment will halt if Release Lock is active."
+          
+      - name: Deploy Placeholder
+        shell: bash
+        run: echo "Executing Production Deployment..."

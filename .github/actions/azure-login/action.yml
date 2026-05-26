@@ -1,0 +1,34 @@
+name: 'Azure OIDC Login'
+description: 'Authenticates to Azure using OpenID Connect (OIDC)'
+
+inputs:
+  client-id:
+    description: 'The Client ID of the Azure Managed Identity or App Registration'
+    required: true
+  tenant-id:
+    description: 'The Azure Tenant ID'
+    required: true
+  subscription-id:
+    description: 'The Azure Subscription ID'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    # -------------------------------------------------------------------------
+    # VENDOR ACTION: Official Azure Login wrapper for OIDC
+    # TODO (PENDING DACI): Currently assumes standard federated credentials. 
+    # Will update if Flexible Federated Credentials are approved.
+    # -------------------------------------------------------------------------
+    - name: Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ inputs.client-id }}
+        tenant-id: ${{ inputs.tenant-id }}
+        subscription-id: ${{ inputs.subscription-id }}
+        
+    - name: Verify Azure CLI Context
+      shell: bash
+      run: |
+        echo "Verifying Azure connection and active subscription..."
+        az account show

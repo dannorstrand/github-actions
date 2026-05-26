@@ -1,0 +1,58 @@
+name: '.NET Build & SonarQube Scan'
+description: 'Builds a .NET solution and executes SonarQube static analysis'
+
+inputs:
+  solution-path:
+    description: 'Path to the .sln or .csproj file'
+    required: true
+  build-configuration:
+    description: 'Build configuration (e.g., Release)'
+    required: true
+    default: 'Release'
+  sonar-project-key:
+    description: 'SonarQube Project Key identifier'
+    required: true
+  sonar-token:
+    description: 'SonarQube Authentication Token'
+    required: true
+  sonar-host-url:
+    description: 'SonarQube Server URL'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Install SonarScanner
+      shell: pwsh
+      run: dotnet tool install --global dotnet-sonarscanner
+
+    - name: SonarQube Begin
+      shell: pwsh
+      run: >
+        dotnet sonarscanner begin 
+        /k:"${{ inputs.sonar-project-key }}" 
+        /d:sonar.token="${{ inputs.sonar-token }}" 
+        /d:sonar.host.url="${{ inputs.sonar-host-url }}" 
+        /d:sonar.cs.vstest.reportsPaths="**/*.trx"
+
+    - name: Dotnet Restore
+      shell: pwsh
+      run: dotnet restore ${{ inputs.solution-path }} --locked-mode
+
+    - name: Dotnet Build
+      shell: pwsh
+      run: dotnet build ${{ inputs.solution-path }} --configuration ${{ inputs.build-configuration }} --no-restore
+
+    - name: Dotnet Test (Generate TRX)
+      shell: pwsh
+      continue-on-error: true # Ensures tests complete and logs are gathered even if some tests fail
+      run: dotnet test ${{ inputs.solution-path }} --configuration ${{ inputs.build-configuration }} --no-build --logger "trx"
+
+    - name: SonarQube End
+      shell: pwsh
+      run: dotnet sonarscanner end /d:sonar.token="${{ inputs.sonar-token }}"

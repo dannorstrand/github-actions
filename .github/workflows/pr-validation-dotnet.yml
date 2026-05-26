@@ -1,0 +1,51 @@
+name: 'Reusable: PR Validation (.NET)'
+on:
+  workflow_call:
+    inputs:
+      solution-file:
+        description: 'Path to the .sln file'
+        required: true
+        type: string
+
+jobs:
+  validate-and-scan:
+    name: 'Build Check & SAST'
+    runs-on: ubuntu-latest
+    
+    # Ensuring explicit token permissions for security and OIDC compliance
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for accurate GitVersion calculation later
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore Dependencies
+        shell: bash
+        run: |
+          echo "Restoring packages for ${{ inputs.solution-file }}..."
+          dotnet restore "${{ inputs.solution-file }}" --locked-mode
+
+      - name: Execute Build (No-Restore)
+        shell: bash
+        run: |
+          echo "Executing Debug build for PR validation..."
+          dotnet build "${{ inputs.solution-file }}" \
+            --configuration Debug \
+            --no-restore
+
+      # Call our custom composite action (Assuming it lives in a shared repo)
+      - name: Execute CodeQL Security Scan
+        uses: Client/shared-composite-actions/codeql-sast@v1 # Pinned to v1 major tag for internal shared actions
+        with:
+          language: 'csharp'
+          build-mode: 'none' # Build is handled manually above

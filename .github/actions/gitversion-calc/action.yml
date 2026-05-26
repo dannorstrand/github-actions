@@ -1,0 +1,44 @@
+name: 'Enterprise GitVersion Calculation'
+description: 'Calculates semantic versioning using GitVersion based on the commit graph to ensure immutable artifact traceability.'
+
+inputs:
+  config-file-path:
+    description: 'Path to the GitVersion.yml configuration file.'
+    required: false
+    default: 'GitVersion.yml'
+
+outputs:
+  semver:
+    description: 'The standard semantic version calculated by GitVersion.'
+    value: ${{ steps.execute_gitversion.outputs.semVer }}
+  assembly-semver:
+    description: 'The .NET compatible Assembly Semantic Version.'
+    value: ${{ steps.execute_gitversion.outputs.assemblySemVer }}
+  informational-version:
+    description: 'The full Informational Version string, including the commit SHA.'
+    value: ${{ steps.execute_gitversion.outputs.informationalVersion }}
+
+runs:
+  using: "composite"
+  steps:
+    # 1. Install the official GitVersion tooling
+    - name: Setup GitVersion
+      uses: gittools/actions/gitversion/setup@v3
+      with:
+        versionSpec: '6.x' # Target modern GitVersion 6.x line
+        preferLatestVersion: true
+
+    # 2. Execute GitVersion and inject variables into the workflow context
+    - name: Execute GitVersion
+      id: execute_gitversion
+      uses: gittools/actions/gitversion/execute@v3
+      with:
+        useConfigFile: true
+        configFilePath: ${{ inputs.config-file-path }}
+
+    # 3. Explicitly log the calculated version for pipeline auditability
+    - name: Log Calculated Semantic Version
+      shell: bash
+      run: |
+        echo "::notice title=GitVersion Evaluation Complete::Calculated Semantic Version is ${{ steps.execute_gitversion.outputs.semVer }}"
+        echo "Informational Version: ${{ steps.execute_gitversion.outputs.informationalVersion }}"

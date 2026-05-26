@@ -1,0 +1,57 @@
+name: 'Enterprise Mend SCA Scan'
+description: 'Executes Mend Software Composition Analysis (SCA) to detect vulnerabilities and enforce supply chain security gates.'
+
+inputs:
+  mend-url:
+    description: 'The organization-specific Mend SaaS URL.'
+    required: true
+  mend-user-key:
+    description: 'The Mend authentication token/key.'
+    required: true
+  mend-project-scope:
+    description: 'The Mend project scope identifier for the scan.'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Mend CLI
+      shell: bash
+      run: |
+        echo "Downloading Mend CLI..."
+        curl -sL "https://downloads.mend.io/cli/linux_amd64/mend" -o mend
+        chmod +x mend
+        echo "Mend CLI downloaded and marked executable."
+
+    - name: Authenticate Mend CLI
+      shell: bash
+      run: |
+        echo "Authenticating with Mend Platform..."
+        ./mend auth login --url "${{ inputs.mend-url }}" --token "${{ inputs.mend-user-key }}"
+
+    - name: Run Mend SCA Scan with Quality Gate
+      id: mend-scan
+      shell: bash
+      continue-on-error: false 
+      run: |
+        echo "Starting Mend SCA Dependency Scan for scope: ${{ inputs.mend-project-scope }}..."
+        
+        # Execute the scan in strict mode, generating a JSON output format
+        set +e # Disable automatic exit on error to manually handle the exit code
+        ./mend dep --dir "${{ github.workspace }}" --scope "${{ inputs.mend-project-scope }}" --update --strict --format json
+        EXIT_CODE=$?
+        set -e # Re-enable automatic exit on error
+        
+        # Enforce the FDIC-aligned quality gate based on Mend's exit codes
+        if [ $EXIT_CODE -eq 0 ]; then
+          echo "::notice title=Mend SCA Result::Scan completed successfully with no policy violations."
+        elif [ $EXIT_CODE -eq 1 ]; then
+          echo "::error title=Mend SCA Violation::Mend SCA scan found policy violations or critical vulnerabilities."
+          exit 1
+        elif [ $EXIT_CODE -eq 9 ]; then
+          echo "::warning title=Mend SCA Warning::Scan completed with warnings (e.g., missing dependencies)."
+          # Decide if warnings should fail the build based on future client decisions. Allowing to pass for now.
+        else
+          echo "::error title=Mend SCA Failure::Mend SCA scan failed unexpectedly with exit code: $EXIT_CODE."
+          exit $EXIT_CODE
+        fi

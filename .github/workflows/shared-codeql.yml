@@ -1,0 +1,39 @@
+name: "Shared CodeQL Security Scan"
+
+on:
+  workflow_call:
+    inputs:
+      language:
+        description: 'Language to analyze (e.g., csharp, javascript)'
+        required: true
+        type: string
+        default: 'csharp'
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write # Required to upload SARIF results to GitHub Advanced Security
+
+jobs:
+  analyze:
+    name: Analyze Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------------------------
+      # VENDOR ACTION: Official GitHub Advanced Security Actions
+      # -------------------------------------------------------------------------
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ inputs.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{inputs.language}}"
